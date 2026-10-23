@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyRoute Logistics | Task 3 Dashboard</title>
+<style>
+:root{--navy:#102a43;--blue:#0876b9;--bg:#f1f5f9;--muted:#64748b}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#172033}
+header{background:var(--navy);color:white;padding:25px clamp(18px,4vw,52px);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+h1{margin:0 0 8px;font-size:clamp(24px,3vw,34px)}header p{margin:0;color:#dbeafe}
+main{max-width:1250px;margin:24px auto;padding:0 20px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+button,select,input{font:inherit;border-radius:8px;padding:11px 14px}
+button{border:0;background:var(--blue);color:white;cursor:pointer;transition:.15s}
+button:hover{filter:brightness(.9);transform:translateY(-1px)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+.secondary{background:#e2e8f0;color:#102a43}.dark{background:#334155}
+select,input{border:1px solid #cbd5e1;background:white}
+.notice{font-size:14px;color:var(--muted);margin:8px 0 18px;min-height:18px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.card,.panel{background:white;padding:22px;border-radius:13px;box-shadow:0 4px 16px #0f172a0c}
+.card h3{font-size:13px;letter-spacing:.04em;color:var(--muted);margin:0 0 14px}
+.number{font-size:30px;font-weight:700}.blue{color:var(--blue)}.green{color:#15803d}.orange{color:#c2410c}
+.grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;margin-top:18px}
+.panel h2{font-size:19px;margin:0 0 18px}.small{font-size:13px;line-height:1.6;color:var(--muted)}
+.status{padding:13px;border-radius:8px;background:#dcfce7;color:#166534;font-weight:700;margin-bottom:12px}
+.warn{background:#fef3c7;color:#92400e}
+.metric-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:15px}
+.mini{padding:12px;background:#f8fafc;border-radius:8px}.mini b{display:block;font-size:20px;margin-top:5px}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+th{background:#f8fafc;color:#475569}
+.pill{display:inline-block;padding:4px 8px;border-radius:20px;font-size:12px;background:#e2e8f0}
+.pill.live-csv{background:#dc2626;color:#fff;font-weight:700}
+.pill.Delivered{background:#dcfce7;color:#166534}.pill.Delayed{background:#fef3c7;color:#92400e}.pill.Failed{background:#fee2e2;color:#991b1b}
+details{border:1px solid #e2e8f0;border-radius:9px;padding:12px 14px;margin:10px 0}
+summary{cursor:pointer;font-weight:bold}footer{text-align:center;padding:25px;color:var(--muted);font-size:12px}
+@media(max-width:850px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}}
+@media(max-width:480px){.cards,.metric-list{grid-template-columns:1fr}main{padding:0 12px}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>SkyRoute Logistics</h1><p>Interactive Data Pipeline Monitoring Dashboard</p></div>
+  <span id="headerStatus" class="pill">Demo data</span>
+</header>
+<main>
+  <div class="toolbar">
+    <button id="refreshBtn" type="button">↻ Refresh CSV data</button>
+    <button id="runBtn" class="dark" type="button">▶ Simulate pipeline run</button>
+    <button id="resetBtn" class="secondary" type="button">Reset demo</button>
+    <label>View:
+      <select id="viewSelect">
+        <option value="all">All records</option><option value="Delivered">Delivered</option>
+        <option value="Delayed">Delayed</option><option value="Failed">Failed</option><option value="Unknown">Unknown</option>
+      </select>
+    </label>
+    <label>Search: <input id="searchInput" type="search" placeholder="Order ID or region"></label>
+  </div>
+  <div id="notice" class="notice" role="status">Demo data loaded. Use the buttons and filters to explore.</div>
+
+  <section class="cards">
+    <div class="card"><h3>INPUT ROWS</h3><div class="number blue" id="inputRows">10</div></div>
+    <div class="card"><h3>CLEANED ROWS</h3><div class="number green" id="cleanRows">8</div></div>
+    <div class="card"><h3>ROWS REMOVED</h3><div class="number orange" id="removedRows">2</div></div>
+    <div class="card"><h3>PIPELINE STATUS</h3><div class="number green" style="font-size:23px" id="pipelineStatus">Ready</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Delivery Status Chart</h2>
+      <div style="height:250px;position:relative"><canvas id="deliveryChartCanvas" aria-label="Interactive delivery status chart" role="img" style="width:100%;height:250px"></canvas></div>
+      <div id="chartLegend" class="small" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px"></div>
+      <p id="chartMessage" class="small">Click a bar to filter records by status.</p>
+      <button id="showAllChart" class="secondary" type="button">Show All Records</button>
+    </div>
+    <div class="panel">
+      <h2>Pipeline Execution</h2>
+      <div id="runStatus" class="status">Pipeline ready</div>
+      <p id="details" class="small">8 valid records available in the cleaned output.</p>
+      <div class="metric-list">
+        <div class="mini"><span class="small">Last run</span><b id="lastRun">Not run</b></div>
+        <div class="mini"><span class="small">Duration</span><b id="duration">—</b></div>
+        <div class="mini"><span class="small">Tests</span><b id="testCount">3 / 3</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top:18px">
+    <h2>Delivery Records</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Order ID</th><th>Delivery Status</th><th>Delivery Date</th><th>Region</th></tr></thead>
+      <tbody id="recordsBody"></tbody>
+    </table></div>
+    <p class="small">Use the View and Search controls to filter records.</p>
+  </section>
+
+  <section class="panel" style="margin-top:18px">
+    <h2>Monitoring and Troubleshooting</h2>
+    <details open><summary>Pipeline health</summary><p class="small">Displays source and cleaned record counts, status distribution and refresh feedback.</p></details>
+    <details><summary>Unit testing</summary><p class="small">The Python terminal showed three passing tests: valid rows preserved, duplicate rows removed, and missing rows removed.</p></details>
+    <details><summary>Logging and recovery</summary><p class="small">The Python script writes pipeline.log. Review it when troubleshooting. The Simulate button is a demonstration only and does not execute Python.</p></details>
+  </section>
+</main>
+<footer>SkyRoute Logistics Ltd | Task 3 — Deployment, Monitoring and Troubleshooting</footer>
+
+<script>
+const demoRecords=[
+ {Order_ID:"1001",Delivery_Status:"Delivered",Delivery_Date:"2026-10-10",Region:"London"},
+ {Order_ID:"1002",Delivery_Status:"Delayed",Delivery_Date:"2026-10-11",Region:"Manchester"},
+ {Order_ID:"1003",Delivery_Status:"Delivered",Delivery_Date:"2026-10-11",Region:"Birmingham"},
+ {Order_ID:"1004",Delivery_Status:"Failed",Delivery_Date:"2026-10-12",Region:"Leeds"},
+ {Order_ID:"1005",Delivery_Status:"Delayed",Delivery_Date:"2026-10-12",Region:"London"},
+ {Order_ID:"1006",Delivery_Status:"Delivered",Delivery_Date:"2026-10-13",Region:"Manchester"},
+ {Order_ID:"1007",Delivery_Status:"Delivered",Delivery_Date:"2026-10-13",Region:"Bristol"},
+ {Order_ID:"1009",Delivery_Status:"Failed",Delivery_Date:"2026-10-13",Region:"Birmingham"}
+];
+let records=[...demoRecords],inputCount=10,cleanedCount=8,removedCount=2,runNumber=0,chartBars=[];
+const $=id=>document.getElementById(id);
+
+function parseCSV(text){
+ const lines=text.replace(/^\uFEFF/,"").trim().split(/\r?\n/);
+ if(lines.length<2)return[];
+ // CSV parser supports quoted fields containing commas.
+ const splitLine=line=>{const out=[];let value="",quoted=false;
+   for(let i=0;i<line.length;i++){const c=line[i];
+     if(c==='"'&&line[i+1]==='"'&&quoted){value+='"';i++;}
+     else if(c==='"')quoted=!quoted;
+     else if(c===","&&!quoted){out.push(value.trim());value="";}
+     else value+=c;
+   }out.push(value.trim());return out;};
+ const headers=splitLine(lines[0]);
+ return lines.slice(1).filter(line=>line.trim()).map(line=>{
+   const vals=splitLine(line),row={};headers.forEach((h,i)=>row[h]=(vals[i]||"").trim());return row;
+ });
+}
+function getStatus(r){return r.Delivery_Status||r.Status||r.DeliveryStatus||r.delivery_status||"Unknown";}
+function getOrder(r){return r.Order_ID||r.order_id||r.OrderID||r.OrderId||"";}
+function getDate(r){return r.Delivery_Date||r.Date||r.delivery_date||"—";}
+function getRegion(r){return r.Region||r.region||"—";}
+
+function drawDeliveryChart(counts){
+ const canvas=$("deliveryChartCanvas"),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+ const W=Math.max(320,rect.width),H=250;
+ canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+ const ctx=canvas.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+ const items=Object.entries(counts),colors={Delivered:"#16a34a",Delayed:"#f59e0b",Failed:"#dc2626",Unknown:"#64748b"};
+ const max=Math.max(1,...items.map(([,v])=>v)),left=42,right=12,top=18,bottom=42,plotH=H-top-bottom,plotW=W-left-right;
+ ctx.font="12px Arial";ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillStyle="#64748b";
+ for(let i=0;i<=4;i++){const val=Math.round(max*i/4),y=top+plotH-(i/4)*plotH;ctx.strokeStyle="#e2e8f0";ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-right,y);ctx.stroke();ctx.fillText(String(val),left-8,y);}
+ const slot=plotW/items.length;chartBars=[];
+ items.forEach(([name,val],i)=>{
+   const bw=Math.min(58,slot*.56),x=left+i*slot+(slot-bw)/2,bh=(val/max)*plotH,y=top+plotH-bh;
+   ctx.fillStyle=colors[name];ctx.beginPath();
+   if(ctx.roundRect)ctx.roundRect(x,y,bw,Math.max(2,bh),6);else ctx.rect(x,y,bw,Math.max(2,bh));ctx.fill();
+   ctx.fillStyle="#172033";ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText(String(val),x+bw/2,y-5);
+   ctx.fillStyle="#475569";ctx.textBaseline="top";ctx.fillText(name,x+bw/2,top+plotH+9);
+   chartBars.push({name,x,y,w:bw,h:Math.max(2,bh)});
+ });
+ $("chartLegend").innerHTML=items.map(([name])=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${colors[name]};margin-right:5px"></span>${name}</span>`).join("");
+}
+function render(){
+ $("inputRows").textContent=inputCount;$("cleanRows").textContent=cleanedCount;$("removedRows").textContent=removedCount;
+ const counts={Delivered:0,Delayed:0,Failed:0,Unknown:0};
+ records.forEach(r=>{let s=getStatus(r);if(!(s in counts))s="Unknown";counts[s]++;});
+ drawDeliveryChart(counts);
+ const filter=$("viewSelect").value,q=$("searchInput").value.trim().toLowerCase();
+ const shown=records.filter(r=>(filter==="all"||getStatus(r)===filter)&&Object.values(r).join(" ").toLowerCase().includes(q));
+ $("recordsBody").replaceChildren();
+ shown.forEach(r=>{
+   const tr=document.createElement("tr");
+   [getOrder(r)||"—",getStatus(r),getDate(r),getRegion(r)].forEach((v,i)=>{
+     const td=document.createElement("td");
+     if(i===1){const p=document.createElement("span");p.className="pill "+(v in {Delivered:1,Delayed:1,Failed:1}?v:"");p.textContent=v;td.appendChild(p);}
+     else td.textContent=v;
+     tr.appendChild(td);
+   });$("recordsBody").appendChild(tr);
+ });
+ if(!shown.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=4;td.textContent="No matching records. Clear Search or choose All records.";tr.appendChild(td);$("recordsBody").appendChild(tr);}
+}
+async function refreshData(){
+ $("notice").textContent="Trying to load CSV files…";
+ try{
+   const [a,b]=await Promise.all([fetch("input.csv?t="+Date.now()),fetch("cleaned_output.csv?t="+Date.now())]);
+   if(!a.ok||!b.ok)throw Error("CSV files not found");
+   const raw=parseCSV(await a.text()),clean=parseCSV(await b.text());
+   if(!raw.length||!clean.length)throw Error("CSV files are empty or have no data rows");
+   inputCount=raw.length;cleanedCount=clean.length;removedCount=Math.max(0,inputCount-cleanedCount);
+   records=clean.map(r=>({Order_ID:getOrder(r),Delivery_Status:getStatus(r),Delivery_Date:getDate(r),Region:getRegion(r)}));
+   $("headerStatus").textContent="Live CSV";$("headerStatus").classList.add("live-csv");
+   $("notice").textContent="CSV data refreshed successfully.";
+   $("runStatus").className="status";$("runStatus").textContent="CSV data loaded successfully";
+   $("details").textContent=`Input records: ${inputCount}. Cleaned records: ${cleanedCount}. Check pipeline.log for execution details.`;
+   $("pipelineStatus").textContent="Loaded";$("pipelineStatus").className="number green";
+ }catch(e){
+   $("notice").textContent="Could not refresh CSV: ensure input.csv and cleaned_output.csv are beside index.html and open this page with VS Code Live Server. Showing current records.";
+ }
+ render();
+}
+function simulateRun(){
+ runNumber++;$("pipelineStatus").textContent="Demo success";$("runStatus").className="status";$("runStatus").textContent="Demo run completed";
+ $("details").textContent="Demo only. To execute the real pipeline, run python pipeline.py in the VS Code terminal.";
+ $("lastRun").textContent=new Date().toLocaleTimeString();$("duration").textContent=(0.2+Math.random()*.8).toFixed(2)+" s";$("testCount").textContent="3 / 3";
+ $("notice").textContent="Demo run #"+runNumber+" shown. Python was not executed by this button.";
+}
+function resetDemo(){
+ records=[...demoRecords];inputCount=10;cleanedCount=8;removedCount=2;runNumber=0;
+ $("viewSelect").value="all";$("searchInput").value="";$("pipelineStatus").textContent="Ready";$("pipelineStatus").className="number green";
+ $("runStatus").className="status";$("runStatus").textContent="Pipeline ready";$("details").textContent="8 valid records available in the cleaned output.";
+ $("lastRun").textContent="Not run";$("duration").textContent="—";$("testCount").textContent="3 / 3";$("notice").textContent="Demo dashboard reset.";
+ $("headerStatus").textContent="Demo data";$("headerStatus").classList.remove("live-csv");$("chartMessage").textContent="Click a bar to filter records by status.";render();
+}
+$("deliveryChartCanvas").addEventListener("click",function(event){
+ const rect=this.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
+ const bar=chartBars.find(b=>x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h);
+ if(bar){$("viewSelect").value=bar.name==="Unknown"?"Unknown":bar.name;$("chartMessage").textContent="Chart filter selected: "+bar.name;render();}
+});
+$("showAllChart").addEventListener("click",()=>{$("viewSelect").value="all";$("searchInput").value="";$("chartMessage").textContent="Showing all delivery statuses.";render();});
+window.addEventListener("resize",render);
+$("refreshBtn").addEventListener("click",refreshData);$("runBtn").addEventListener("click",simulateRun);$("resetBtn").addEventListener("click",resetDemo);
+$("viewSelect").addEventListener("change",render);$("searchInput").addEventListener("input",render);
+render();
+</script>
+</body>
+</html>

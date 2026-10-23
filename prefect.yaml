@@ -1,0 +1,11 @@
+
+name: skyroute-data-pipeline
+prefect-version: 3.8.8
+
+entrypoint: prefect_demo.py:skyroute_pipeline
+
+deployments:
+  - name: skyroute-local
+    entrypoint: prefect_demo.py:skyroute_pipeline
+    description: SkyRoute Logistics data pipeline
+    parameters: {}

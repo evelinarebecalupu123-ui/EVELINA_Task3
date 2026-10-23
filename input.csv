@@ -1,0 +1,12 @@
+
+Order_ID,Delivery_Status,Delivery_Date,Region
+1001,Delivered,2026-10-10,London
+1002,Delayed,2026-10-11,Manchester
+1003,Delivered,2026-10-11,Birmingham
+1003,Delivered,2026-10-11,Birmingham
+1004,Failed,2026-10-12,Leeds
+1005,Delayed,2026-10-12,London
+1006,Delivered,2026-10-13,Manchester
+1007,,2026-10-13,Bristol
+1008,Delivered,2026-10-13,Leeds
+1009,Failed,2026-10-13,Birmingham
